@@ -1,0 +1,172 @@
+/**
+ * @file
+ * @brief Структуры данных чека.
+ * 
+ * Содержит описания типов, используемых при передаче чеков.
+ */
+
+import "common.proto";
+
+option optimize_for = SPEED;
+option java_package = "org.epicsquad.kkm.proto";
+
+package kkm.proto;
+
+message TicketRequest {
+  message Tax {
+    required uint32 tax_type         = 1;
+    required uint32 taxation_type    = 2;
+    required uint32 percent          = 3;
+    required Money  sum              = 4;
+    required bool   is_in_total_sum  = 5;
+  } // message TicketRequest.Tax
+
+  // describes markups discounts, storno
+  message Modifier {
+    optional string name  = 1;
+    required Money  sum   = 2;
+    repeated Tax    taxes = 3;
+		repeated KeyValuePair auxiliary = 4; // since protocol version 125
+  } // message TicketRequest.Modifier
+
+  message Operator {
+    required uint32 code = 1;
+    optional string name = 2;
+  } // message TicketRequest.Operator
+
+  // describes one position in ticket
+  message Item {
+    message Commodity {
+      optional uint32 code         = 1;
+      optional string name         = 2;
+      required string section_code = 3;
+      required uint32 quantity     = 4;
+      required Money  price        = 5;
+      required Money  sum          = 6;
+      repeated Tax    taxes        = 7;
+      optional string excise_stamp = 8;
+			repeated KeyValuePair auxiliary = 9; // since protocol version 125
+    } // message TicketRequest.Item.Commodity
+
+    message StornoCommodity {
+      optional string name         = 1;
+      required string section_code = 2;
+      required uint32 quantity     = 3;
+      required Money  price        = 4;
+      required Money  sum          = 5;
+      repeated Tax    taxes        = 6;
+      optional string excise_stamp = 7;
+			repeated KeyValuePair auxiliary = 8; // since protocol version 125
+    } // message TicketRequest.Item.StornoCommodity
+
+    enum ItemTypeEnum {
+      ITEM_TYPE_COMMODITY        = 1;
+      ITEM_TYPE_STORNO_COMMODITY = 2;
+      ITEM_TYPE_MARKUP           = 3;
+      ITEM_TYPE_STORNO_MARKUP    = 4;
+      ITEM_TYPE_DISCOUNT         = 5;
+      ITEM_TYPE_STORNO_DISCOUNT  = 6;
+   } // enum Item.ItemTypeEnum
+
+    required ItemTypeEnum    type             = 1;
+    optional Commodity       commodity        = 2; // required if type == ITEM_TYPE_COMMODITY
+    optional StornoCommodity storno_commodity = 3; // required if type == ITEM_TYPE_STORNO_COMMODITY
+    optional Modifier        markup           = 4; // required if type == ITEM_TYPE_MARKUP
+    optional Modifier        storno_markup    = 5; // required if type == ITEM_TYPE_STORNO_MARKUP
+    optional Modifier        discount         = 6; // required if type == ITEM_TYPE_DISCOUNT
+    optional Modifier        storno_discount  = 7; // required if type == ITEM_TYPE_STORNO_DISCOUNT
+  } // message TicketRequest.Item
+
+  message Domain {
+
+    /**
+    * @brief Сфера оказания услуг, отели и рестораны.
+    * 
+    * На текущий момент не используется.
+    */
+    message Services {
+      required string account_number = 1;
+    } // message TicketRequest.Domain.Services
+
+    /**
+    * @brief Сфера торговли нефтепродуктами.
+    * 
+    * На текущий момент не используется.
+    */
+    message GasOil {
+      optional string correction_number = 1;
+      optional Money  correction_sum    = 2;
+      optional string card_number       = 3;
+    } // message TicketRequest.Domain.GasOil
+
+    /**
+    * @brief Такси.
+    * 
+    * На текущий момент не используется.
+    */
+    message Taxi {
+      required string car_number  = 1;
+      required bool   is_order    = 2;
+      required Money  current_fee = 3;
+    } // message TicketRequest.Domain.Taxi
+
+    /**
+    * @brief Парковки.
+    * 
+    * На текущий момент не используется.
+    */
+    message Parking {
+      required DateTime begin_time = 1;
+      required DateTime end_time   = 2;
+    } // message TicketRequest.Domain.Parking
+
+    required DomainTypeEnum type     = 1;
+    optional Services       services = 2;
+    optional GasOil         gasoil   = 3;
+    optional Taxi           taxi     = 4;
+    optional Parking        parking  = 5;
+  } // message TicketRequest.Domain
+
+  message ExtensionOptions {
+    optional string customer_email = 1;
+    optional string customer_phone = 2;
+		repeated KeyValuePair auxiliary = 3; // since protocol version 125
+  }
+
+  message Payment {
+    required PaymentTypeEnum type = 1;
+    required Money           sum  = 2;
+  } // message TicketRequest.Payment
+
+  message Amounts {
+    required Money    total    = 1;
+    optional Money    taken    = 2;
+    optional Money    change   = 3;
+    optional Modifier markup   = 4; // if set discount should't be set
+    optional Modifier discount = 5; // if set markup should't be set
+  } // message TicketRequest.Amounts
+
+  required OperationTypeEnum operation               = 1;
+  required DateTime          date_time               = 2;
+  required Operator          operator                = 3;
+  required Domain            domain                  = 4;
+  repeated Item              items                   = 5;
+  repeated Payment           payments                = 6;
+  repeated Tax               taxes                   = 7;
+  required Amounts           amounts                 = 8;
+  optional ExtensionOptions  extension_options       = 9;
+  optional uint32            offline_ticket_number   = 10;
+  optional string            printed_document_number = 11;
+  optional string            printed_ticket          = 12; // ticket in one string, delimiter - \n
+  /// @deprecated используйте ServiceRequest
+  /// поле игнорируется ККМ сервером
+  repeated TicketAdInfo      ad_infos                = 13;
+  optional uint32            fr_shift_number         = 14;
+  optional uint32            shift_document_number   = 15; // since protocol version 125
+} // message TicketRequest;
+
+message TicketResponse {
+  required string ticket_number = 1;
+  optional bytes  qr_code       = 2;
+} // message TicketResponse
+

@@ -1,0 +1,17 @@
+import "common.proto";
+
+option optimize_for = SPEED;
+option java_package = "org.epicsquad.kkm.proto";
+
+package kkm.proto;
+
+message BindedTaxation {
+  
+  message BindedTax {
+    required TaxTypeEnum tax_type  = 1;
+    required uint32 percent = 2;
+  }
+
+  required uint32 TaxationTypeEnum  = 1;
+  repeated BindedTax taxes = 2;
+}

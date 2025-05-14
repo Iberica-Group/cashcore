@@ -44,7 +44,7 @@ type
 
 type
     TFDConnectionHelper = class helper for TFDConnection
-        function JSON_Object_Save(const obj: iSuperObject; const objClassName: string): boolean;
+        function JSON_Object_Save(var obj: iSuperObject; const objClassName: string): boolean;
         function JSON_Object_Update(const obj: iSuperObject; const objClassName: string): boolean;
     end;
 
@@ -464,23 +464,27 @@ begin
             obj.Remove('ID');
     end;
 
+    var
+    jsonCast := '';
+
     case GetDBDriverID(Self) of
         diSQLite:
             last_id_selector := 'last_insert_rowid';
-        diPostgreSQL:
-            last_id_selector := 'LASTVAL';
         diMySQL:
             last_id_selector := 'LAST_INSERT_ID';
+        diPostgreSQL:
+            begin
+                last_id_selector := 'LASTVAL';
+                jsonCast := '::json';
+            end;
     end;
 
     var
     FDQuery := TFDQuery.Create(nil);
     FDQuery.Connection := Self;
 
-// DoSync(procedure begin
-    FDQuery.SQL.Text := Format('INSERT INTO `%s` (`Object`) VALUES (:p0);', [objClassName]);
-    FDQuery.Params[0].AsString := obj.AsJSON();
-// end);
+    FDQuery.SQL.Text := Format('INSERT INTO `%0:s` (`Object`) VALUES (:pValue%1:s);', [objClassName, jsonCast]);
+    FDQuery.Params.ParamByName('pValue').AsString := obj.AsJSON();
 
     var
     attemptsLeft := DefaultAttemptsLeft; // делаем несколько попыток - это нужно для обхода временных ошибок вроде "Database is locked"
@@ -494,20 +498,22 @@ begin
         except
             on E: Exception do
             begin
-                WriteLog('TFDConnectionHelper.JSON_Object_Save exception [%s]: %s', [E.ClassName, E.Message], ltError);
                 dec(attemptsLeft);
                 sleep(DefaultAttemptsDelay);
+                if attemptsLeft <= 0 then
+                begin
+                    WriteLog('TFDConnectionHelper.JSON_Object_Save exception [%s]: %s', [E.ClassName, E.Message], ltError);
+                    FDQuery.SafeDestroy;
+                    raise;
+                end;
             end;
         end;
 
-    FDQuery.Connection := nil;
-    FDQuery.Destroy;
+    FDQuery.SafeDestroy;
 end;
 
 
 function TFDConnectionHelper.JSON_Object_Update;
-var
-    objID: Cardinal;
 begin
     Result := false;
 
@@ -517,36 +523,41 @@ begin
     if not obj.Contains('ID') then
         exit;
 
-    objID := obj.I['ID'];
+    var
+    jsonCast := '';
+    if GetDBDriverID(Self) = diPostgreSQL then
+        jsonCast := '::json';
 
     var
     FDQuery := TFDQuery.Create(nil);
     FDQuery.Connection := Self;
-    FDQuery.SQL.Text := Format('UPDATE `%s` SET `Object` = :p0 WHERE `ID` = :p1 ;', [objClassName]);
-    FDQuery.Params[1].AsInteger := objID;
-
-    if obj.Contains('ID') then
-        obj.Remove('ID');
+    FDQuery.SQL.Text := Format('UPDATE `%0:s` SET `Object` = :pValue%1:s WHERE `ID` = :pID ;', [objClassName, jsonCast]);
+    FDQuery.Params.ParamByName('pID').AsInteger := obj.I['ID'];
+    obj.Remove('ID'); // !!!
+    FDQuery.Params.ParamByName('pValue').AsString := obj.AsJSON();
 
     var
     attemptsLeft := DefaultAttemptsLeft; // делаем несколько попыток - это нужно для обхода временных ошибок вроде "Database is locked"
     while attemptsLeft > 0 do
         try
-            FDQuery.Params[0].AsString := obj.AsJSON();
             DB_ExecSQL(FDQuery);
             Result := true;
             attemptsLeft := 0;
         except
             on E: Exception do
             begin
-                WriteLog('TFDConnectionHelper.JSON_Object_Update exception [%s]: %s', [E.ClassName, E.Message], ltError);
                 dec(attemptsLeft);
                 sleep(DefaultAttemptsDelay);
+                if attemptsLeft <= 0 then
+                begin
+                    WriteLog('TFDConnectionHelper.JSON_Object_Update exception [%s]: %s', [E.ClassName, E.Message], ltError);
+                    FDQuery.SafeDestroy;
+                    raise;
+                end;
             end;
         end;
 
-    FDQuery.Connection := nil;
-    FDQuery.Destroy;
+    FDQuery.SafeDestroy;
 end;
 
 initialization

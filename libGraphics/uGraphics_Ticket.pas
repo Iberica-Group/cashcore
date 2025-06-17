@@ -8,6 +8,7 @@ uses
     proto.common,
 
     uMeasurement,
+    uCashRegister,
     uCashRegisterTypes,
 
     uGraphicsUtils,
@@ -22,7 +23,7 @@ uses
     FMX.Graphics,
     FMX.Types;
 
-procedure BuildTicketImage(ResBitmap: TBitmap; Request: TRequest; isCopy: Boolean; bmpWidth: Cardinal; bmpScale: Single; Reg_Info: TRegInfoRecord; Vat_Certificate: TVATCertificate; ads_info: TArray<TSimpleTicketAD>; const OFDRecord: TOfdRecord);
+procedure BuildTicketImage(ResBitmap: TBitmap; Request: TRequest; isCopy: Boolean; bmpWidth: Cardinal; bmpScale: Single; cashBox: TCashRegister; const OFDRecord: TOfdRecord);
 
 implementation
 
@@ -101,15 +102,15 @@ begin
     FieldRight.Width := fmxBitmap.GetWidth(30);
     FieldRight.TextSettings.HorzAlign := TTextAlign.Trailing;
 
-    Row1.Fields[0].Text := Reg_Info.org.title; // НАИМЕНОВАНИЕ ОРГАНИЗАЦИИ
+    Row1.Fields[0].Text := cashBox.Reg_Info.org.title; // НАИМЕНОВАНИЕ ОРГАНИЗАЦИИ
     r := Row1.Draw(fmxBitmap.Canvas, TRect.Create(Xoffset, YOffset, fmxBitmap.Width - Xoffset, fmxBitmap.Height));
     inc(YOffset, r.Height);
 
-    Row1.Fields[0].Text := Reg_Info.pos.address; // АДРЕС ТОРГОВОЙ ТОЧКИ
+    Row1.Fields[0].Text := cashBox.Reg_Info.pos.address; // АДРЕС ТОРГОВОЙ ТОЧКИ
     r := Row1.Draw(fmxBitmap.Canvas, TRect.Create(Xoffset, YOffset, fmxBitmap.Width - Xoffset, fmxBitmap.Height));
     inc(YOffset, r.Height);
 
-    Row1.Fields[0].Text := 'ЖСН (БСН) / ИИН (БИН)' + #13 + Reg_Info.org.inn; // ИИН/БИН ОРГАНИЗАЦИИ
+    Row1.Fields[0].Text := 'ЖСН (БСН) / ИИН (БИН)' + #13 + cashBox.Reg_Info.org.inn; // ИИН/БИН ОРГАНИЗАЦИИ
     r := Row1.Draw(fmxBitmap.Canvas, TRect.Create(Xoffset, YOffset, fmxBitmap.Width - Xoffset, fmxBitmap.Height));
     inc(YOffset, r.Height);
 
@@ -129,6 +130,13 @@ begin
     inc(YOffset, 15);
 { БЛОК РЕКЛАМНОГО ТЕКСТА }
 *)//
+
+    if cashBox.GetOperator.role = lrInspector then
+    begin
+        Row1.Fields[0].Text := '*** КОНТРОЛЬНЫЙ ЧЕК ***';
+        r := Row1.Draw(fmxBitmap.Canvas, TRect.Create(Xoffset, YOffset, fmxBitmap.Width - Xoffset, fmxBitmap.Height));
+        inc(YOffset, r.Height);
+    end;
 
     if isCopy then
     begin
@@ -533,8 +541,8 @@ begin
     FieldRight := @Row2.Fields[1];
     FieldRight.Width := fmxBitmap.GetWidth(45);
     FieldRight.TextSettings.HorzAlign := TTextAlign.Leading;
-    if Vat_Certificate.is_printable AND NOT Vat_Certificate.series.IsEmpty AND NOT Vat_Certificate.number.IsEmpty then
-        FieldRight.Text := 'ҚҚС сериясы' + #13 + 'НДС серия ' + #13 + Vat_Certificate.series + #13 + ' № ' + Vat_Certificate.number;
+    if cashBox.Vat_Certificate.is_printable AND NOT cashBox.Vat_Certificate.series.IsEmpty AND NOT cashBox.Vat_Certificate.number.IsEmpty then
+        FieldRight.Text := 'ҚҚС сериясы' + #13 + 'НДС серия ' + #13 + cashBox.Vat_Certificate.series + #13 + ' № ' + cashBox.Vat_Certificate.number;
 
     r := Row2.Draw(fmxBitmap.Canvas, TRect.Create(Xoffset, YOffset, fmxBitmap.Width - Xoffset, fmxBitmap.Height));
     inc(YOffset, r.Height);
@@ -544,7 +552,7 @@ begin
 
     inc(YOffset, 15);
 
-    for var adsRecord in ads_info do
+    for var adsRecord in cashBox.ads_info do
 // if adsRecord.info.&type = TTicketAdTypeEnum.TICKET_AD_INFO then
     begin
         Row1.Fields[0].Width := fmxBitmap.GetWidth(99);

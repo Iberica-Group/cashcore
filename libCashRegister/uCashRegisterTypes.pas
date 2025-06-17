@@ -145,9 +145,7 @@ type
         title: string;
         address: string;
         inn: string;
-        taxation_type: Cardinal;
         okved: string;
-        tenantId: integer;
         function isAssigned: boolean;
     end;
 
@@ -189,7 +187,7 @@ type
     end;
 
 type
-    TCashRegisterOperatorRole = (lrUnknown, lrAdministrator, lrSeniorCashier, lrCashier);
+    TCashRegisterOperatorRole = (lrUnknown, lrAdministrator, lrSeniorCashier, lrCashier, lrInspector);
 
 type
     TCashRegisterOperator = record
@@ -319,7 +317,7 @@ end;
 
 function TRegInfoRecord_org.isAssigned: boolean;
 begin
-    Result := (not title.IsEmpty) or (not address.IsEmpty) or (not inn.IsEmpty) or (taxation_type > 0) or (not okved.IsEmpty) or (tenantId > 0);
+    Result := (not title.IsEmpty) or (not address.IsEmpty) or (not inn.IsEmpty) or (not okved.IsEmpty);
 end;
 
 { TRegInfoRecord_pos }

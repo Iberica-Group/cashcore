@@ -18,8 +18,7 @@ uses
 
 type
     TKkmRegInfo = class(TAbstractProtoBufClass)
-    public
-         const
+    public const
         tag_point_of_payment_number = 1;
         tag_terminal_number         = 2;
         tag_fns_kkm_id              = 3;
@@ -50,8 +49,7 @@ type
 
 
     TPosRegInfo = class(TAbstractProtoBufClass)
-    public
-         const
+    public const
         tag_title   = 1;
         tag_address = 2;
     strict private
@@ -70,28 +68,21 @@ type
 
 
     TOrgRegInfo = class(TAbstractProtoBufClass)
-    public
-         const
-        tag_title         = 1;
-        tag_address       = 2;
-        tag_inn           = 3;
-        tag_taxation_type = 4;
-        tag_okved         = 5;
-        tag_tenantId      = 6;
+    public const
+        tag_title   = 1;
+        tag_address = 2;
+        tag_inn     = 3;
+        tag_okved   = 5;
     strict private
         Ftitle: string;
         Faddress: string;
         Finn: string;
-        Ftaxation_type: Cardinal;
         Fokved: string;
-        FtenantId: Integer;
 
         procedure Settitle(Tag: Integer; const Value: string);
         procedure Setaddress(Tag: Integer; const Value: string);
         procedure Setinn(Tag: Integer; const Value: string);
-        procedure Settaxation_type(Tag: Integer; const Value: Cardinal);
         procedure Setokved(Tag: Integer; const Value: string);
-        procedure SettenantId(Tag: Integer; const Value: Integer);
     strict protected
         function LoadSingleFieldFromBuf(ProtoBuf: TProtoBufInput; FieldNumber: Integer; WireType: Integer): Boolean; override;
         procedure SaveFieldsToBuf(ProtoBuf: TProtoBufOutput); override;
@@ -99,9 +90,7 @@ type
         property title: string index tag_title read Ftitle write Settitle;
         property address: string index tag_address read Faddress write Setaddress;
         property inn: string index tag_inn read Finn write Setinn;
-        property taxation_type: Cardinal index tag_taxation_type read Ftaxation_type write Settaxation_type;
         property okved: string index tag_okved read Fokved write Setokved;
-        property tenantId: Integer index tag_tenantId read FtenantId write SettenantId;
     end;
 
 implementation
@@ -241,12 +230,8 @@ begin
             address := ProtoBuf.readString;
         tag_inn:
             inn := ProtoBuf.readString;
-        tag_taxation_type:
-            taxation_type := ProtoBuf.readUInt32;
         tag_okved:
             okved := ProtoBuf.readString;
-        tag_tenantId:
-            tenantId := ProtoBuf.readInt32;
         else
             Result := False;
     end;
@@ -262,12 +247,8 @@ begin
         ProtoBuf.writeString(tag_address, Faddress);
     if FieldHasValue[tag_inn] then
         ProtoBuf.writeString(tag_inn, Finn);
-    if FieldHasValue[tag_taxation_type] then
-        ProtoBuf.writeUInt32(tag_taxation_type, Ftaxation_type);
     if FieldHasValue[tag_okved] then
         ProtoBuf.writeString(tag_okved, Fokved);
-    if FieldHasValue[tag_tenantId] then
-        ProtoBuf.writeInt32(tag_tenantId, FtenantId);
 end;
 
 
@@ -292,23 +273,9 @@ begin
 end;
 
 
-procedure TOrgRegInfo.Settaxation_type(Tag: Integer; const Value: Cardinal);
-begin
-    Ftaxation_type := Value;
-    FieldHasValue[Tag] := True;
-end;
-
-
 procedure TOrgRegInfo.Setokved(Tag: Integer; const Value: string);
 begin
     Fokved := Value;
-    FieldHasValue[Tag] := True;
-end;
-
-
-procedure TOrgRegInfo.SettenantId(Tag: Integer; const Value: Integer);
-begin
-    FtenantId := Value;
     FieldHasValue[Tag] := True;
 end;
 

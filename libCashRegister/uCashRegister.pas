@@ -36,7 +36,7 @@ uses
     XSuperObject;
 
 const
-    CashRegisterVersionCode = '25-05-13-16'; // y-m-d-h
+    CashRegisterVersionCode = '25-06-17-12'; // y-m-d-h
 
 type
     TCashRegister = record
@@ -117,7 +117,6 @@ type
 
         Function GetOfflineQueueStartDate(const AFrom: string): System.TDateTime;
         Function GetOperationData(const fr_shift_number_value: integer; const shift_document_number_value: integer; Request: TRequest; Response: TResponse): TResultRecord;
-        Function GetAdsInfo: TArray<TSimpleTicketAD>;
         Procedure CheckOfflineQueue(OneTransaction: boolean = false);
         Procedure SetOFD(const AValue: TOfdRecord);
         Function GetOFD: TOfdRecord;
@@ -142,7 +141,7 @@ type
         Procedure DoInit(DoRequestRegInfo: boolean = true);
         Procedure RequestRegInfo;
 
-        Procedure BuildOfflineTicket(Request: proto.message.TRequest; Response: proto.message.TResponse);
+        Procedure BuildOfflineTicket(Request: proto.message.TRequest; Response: proto.message.TResponse; isDummy: boolean);
         Function TradeOperation(Request: proto.message.TRequest): TResultRecord;
         Function BuildZXReport(report: TZXReport; const report_type: TReportTypeEnum): TResultRecord;
         Function ZXReport(const AReportType: proto.report.TReportTypeEnum; AResultReport: proto.report.TZXReport): TResultRecord;
@@ -675,12 +674,6 @@ begin
                 start_shift_non_nullable_sums[byte(nns.operation)] := ProtoToSum(nns.sum);
 
     Response.Destroy;
-end;
-
-
-Function TCashRegister.GetAdsInfo: TArray<TSimpleTicketAD>;
-begin
-    Result := ads_info;
 end;
 
 
@@ -1723,13 +1716,19 @@ var
     itemTotalSum: Currency;
 
 begin
-    try
-        WriteLog('[TCashRegister.TradeOperation] cash_sum BEFORE: %s', [FormatFloat('0.00', cash_sum)]);
-{ проверка продолжительности оффлайн режима (72 часа) }
-        doCheckOfflineQueueDuration;
+    var
+    isDummy := FOperator.role = lrInspector;
 
-{ контроль продолжительности смены (24 часа) }
-        doCheckShiftDuration(Request.Command);
+    try
+        WriteLog('[TCashRegister.TradeOperation] isDummy: %s, cash_sum BEFORE: %s', [VarToStr(isDummy), FormatFloat('0.00', cash_sum)]);
+
+{ проверка продолжительности оффлайн режима (72 часа) - выполнять в самом начале метода! }
+        if not isDummy then
+            doCheckOfflineQueueDuration;
+
+{ контроль продолжительности смены (24 часа) - выполнять в самом начале метода! }
+        if not isDummy then
+            doCheckShiftDuration(Request.Command);
 
 { проверка на совпадение ИИН/БИН продавца и покупателя: }
         if                                                                                                           //
@@ -1916,7 +1915,8 @@ begin
         Request.ticket.FieldHasValue[Request.ticket.tag_printed_ticket] := false;
 
 { контроль состояния смены }
-        DoOpenShift;
+        if not isDummy then
+            DoOpenShift;
 
         DateTimeToProto(Request.ticket.date_time, Now);
         Request.ticket.FieldHasValue[Request.ticket.tag_date_time] := true;
@@ -1927,15 +1927,18 @@ begin
         var
         Response := proto.message.TResponse.Create;
 
-        Result := SendRequest(Request, Response);
+        Result.Clear;
+
+        if not isDummy then
+            Result := SendRequest(Request, Response);
 
         if Result.isPositive then
         begin
             Result.ResultCode := rc_ok;
 
-{ если касса в автономном режиме, значит надо сформировать автономный чек : }
-            if is_offline then
-                BuildOfflineTicket(Request, Response);
+{ если касса в автономном режиме (или это контрольный чек инспектора), значит надо сформировать автономный чек (или муляж) : }
+            if is_offline or isDummy then
+                BuildOfflineTicket(Request, Response, isDummy);
 
             if Response.FieldHasValue[Response.tag_ticket] then
             begin
@@ -1944,20 +1947,25 @@ begin
             end;
 
 { сохраняем запрос и ответ: }
-
-            if is_offline then
-                SaveRequest(Request, nil, req_num)
-            else
-                SaveRequest(Request, Response, req_num);
+            if not isDummy then
+            begin
+                if is_offline then
+                    SaveRequest(Request, nil, req_num)
+                else
+                    SaveRequest(Request, Response, req_num);
+            end;
 
 { актуализируем счётчики: }
-            cash_sum := cash_sum_new;
-            revenue := revenue_new;
-            non_nullable_sums[byte(Request.ticket.operation)] := non_nullable_sums_new;
-            SetLastShiftNumber(fr_shift_number);
-            SetLastDocumentNumber(shift_document_number);
-            inc(shift_document_number);
-            WriteLog('[TCashRegister.TradeOperation] cash_sum AFTER: %s', [FormatFloat('0.00', cash_sum)]);
+            if not isDummy then
+            begin
+                cash_sum := cash_sum_new;
+                revenue := revenue_new;
+                non_nullable_sums[byte(Request.ticket.operation)] := non_nullable_sums_new;
+                SetLastShiftNumber(fr_shift_number);
+                SetLastDocumentNumber(shift_document_number);
+                inc(shift_document_number);
+            end;
+            WriteLog('[TCashRegister.TradeOperation] isDummy: %s, cash_sum AFTER: %s', [VarToStr(isDummy), FormatFloat('0.00', cash_sum)]);
         end;
 
 // Request.Destroy; - это делает инициатор!
@@ -1975,17 +1983,21 @@ begin
 end;
 
 
-procedure TCashRegister.BuildOfflineTicket;
+procedure TCashRegister.BuildOfflineTicket(Request: TRequest; Response: TResponse; isDummy: boolean);
 begin
-    if offline_ticket_number < 1000 then
-        offline_ticket_number := 1000;
-    inc(offline_ticket_number);
-
-    Request.ticket.offline_ticket_number := offline_ticket_number;
+    if isDummy then
+        Request.ticket.offline_ticket_number := 1234567890
+    else
+    begin
+        if offline_ticket_number < 1000 then
+            offline_ticket_number := 1000;
+        inc(offline_ticket_number);
+        Request.ticket.offline_ticket_number := offline_ticket_number;
+    end;
 
     Response.Command := Request.Command;
 
-    Response.ticket.ticket_number := offline_ticket_number.ToString;
+    Response.ticket.ticket_number := Request.ticket.offline_ticket_number.ToString;
 
     Response.ticket.qr_code := TBytes(ToBytes(Format('%s/?&i=%s&f=%s&s=%s&t=%sT%s', [//
          GetOFD.consumerAddress,                                                     // http://consumer.oofd.kz

@@ -101,6 +101,9 @@ const // Result Codes
     rc_license_online_check_error                          = 93; // ошибка онлайн-проверки лицензии
     rc_item_price_is_incorrect                             = 94; // значение цены для позиции указано некорректно
     rc_item_sum_is_incorrect                               = 95; // значение суммы для позиции указано некорректно
+    rc_tax_value_is_incorrect                              = 96; // значение налога указано некорректно
+    rc_payment_sum_is_incorrect                            = 97; // сумма способа оплаты указана некорректно
+    rc_payment_type_is_incorrect                           = 98; // тип способа оплаты указан некорректно
 
 const
     ResponseText: TArray<string> = [
@@ -200,6 +203,10 @@ const
 { 93 } 'license_online_check_error',                          // ошибка онлайн-проверки лицензии
 { 94 } 'item_price_is_incorrect',                             // значение цены для позиции указано некорректно
 { 95 } 'item_sum_is_incorrect',                               // значение суммы для позиции указано некорректно
+{ 96 } 'tax_value_is_incorrect',                              // значение налога указано некорректно
+{ 97 } 'payment_sum_is_incorrect',                            // сумма способа оплаты указана некорректно
+{ 98 } 'payment_type_is_incorrect',                           // тип способа оплаты указан некорректно
+//
 { -- } ''];
 
 type
